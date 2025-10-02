@@ -1,2 +1,2 @@
 # ansible-config-mgt
-#This will be triggered automatically
+## This will be triggered automatically
