@@ -285,7 +285,7 @@ wireshark --version
 
 [ansible33](/images/ansible33.jpg)
 
-## **Conclusion*8
+## **Conclusion**
 
 We have successfully automated our routine tasks by implementing Ansible configurations. The updated architecture now looks like this:
 
