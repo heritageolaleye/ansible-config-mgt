@@ -1,4 +1,4 @@
------
+---
 - name: Update all Ubuntu servers
   hosts: all
   remote_user: ubuntu
