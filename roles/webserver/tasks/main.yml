@@ -11,25 +11,29 @@
     name: "git"
     state: present
 
-- name: Clone repository
+- name: Install PHP and required modules
   become: true
-  ansible.builtin.git:
-    repo: https://github.com/heritageolaleye/tooling.git
-    dest: /var/www/html
-    force: yes
+  ansible.builtin.apt:
+    name:
+      - php
+      - libapache2-mod-php
+      - php-mysql
+      - php-cli
+      - php-curl
+      - php-zip
+      - php-mbstring
+      - php-xml
+    state: present
+    update_cache: yes
 
-- name: Copy HTML content
+- name: Enable PHP module in Apache
   become: true
-  ansible.builtin.command: cp -r /var/www/html/html/ /var/www/
+  ansible.builtin.command: a2enmod php*
+  args:
+    warn: false
 
-- name: Start Apache service
+- name: Restart Apache to apply PHP configuration
   become: true
   ansible.builtin.service:
-    name: apache2 
-    state: started
-
-- name: Remove cloned directory
-  become: true
-  ansible.builtin.file:
-    path: /var/www/html/html
-    state: absent
+    name: apache2
+    state: restarted
