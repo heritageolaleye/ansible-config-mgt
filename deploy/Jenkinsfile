@@ -1,34 +1,26 @@
 pipeline {
     agent any
 
+    environment {
+        ANSIBLE_HOST_KEY_CHECKING = 'False'
+    }
+
     stages {
-        stage('Build') {
+        stage('Checkout') {
             steps {
-                echo 'Building application'
+                checkout scm
             }
         }
 
-        stage('Test') {
+        stage('Run Ansible Playbook') {
             steps {
-                echo 'Running tests'
-            }
-        }
-
-        stage('Package') {
-            steps {
-                echo 'Packaging application'
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-                echo 'Deploying application'
-            }
-        }
-
-        stage('Clean up') {
-            steps {
-                echo 'Cleaning up workspace'
+                sshagent(credentials: ['ansible-ssh-key']) {
+                    sh '''
+                      ansible-playbook \
+                      -i inventory/hosts \
+                      playbooks/site.yml
+                    '''
+                }
             }
         }
     }
