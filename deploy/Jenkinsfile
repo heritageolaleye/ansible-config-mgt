@@ -1,24 +1,38 @@
 pipeline {
     agent any
 
+    // 1️⃣ Parameterize the environment/inventory
+    parameters {
+        string(
+            name: 'inventory', 
+            defaultValue: 'dev',  
+            description: 'This is the inventory file for the environment to deploy configuration'
+        )
+    }
+
+    // 2️⃣ Set environment variables
     environment {
         ANSIBLE_CONFIG = "${WORKSPACE}/ansible.cfg"
         ANSIBLE_HOST_KEY_CHECKING = 'False'
     }
 
     stages {
+        // 3️⃣ Checkout code
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
+        // 4️⃣ Run Ansible Playbook with dynamic inventory
         stage('Run Ansible Playbook') {
             steps {
                 sshagent(credentials: ['ansible-ssh-key']) {
-                    sh '''
-                      ansible-playbook playbooks/site.yml
-                    '''
+                    sh """
+                      ansible-playbook \
+                        -i inventory/\${inventory}/hosts \
+                        playbooks/site.yml
+                    """
                 }
             }
         }
