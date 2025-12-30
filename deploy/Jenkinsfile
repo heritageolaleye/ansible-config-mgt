@@ -2,7 +2,8 @@ pipeline {
     agent any
 
     environment {
-        ANSIBLE_CONFIG = "${WORKSPACE}/deploy/ansible.cfg"
+        ANSIBLE_CONFIG = "${WORKSPACE}/ansible.cfg"
+        ANSIBLE_HOST_KEY_CHECKING = 'False'
     }
 
     stages {
@@ -16,9 +17,7 @@ pipeline {
             steps {
                 sshagent(credentials: ['ansible-ssh-key']) {
                     sh '''
-                      ansible-playbook \
-                      -i inventory/ci/hosts \
-                      playbooks/site.yml
+                      ansible-playbook playbooks/site.yml
                     '''
                 }
             }
