@@ -291,6 +291,8 @@ We have successfully automated our routine tasks by implementing Ansible configu
 
 ![ansible35](/images/ansible35.png)
 
+Copy-ansible-artifact
+
 
 
 
