@@ -1,5 +1,7 @@
 ---
-- hosts: uat-webservers
-roles:
-  - webserver
+- hosts: nginx
+  become: yes
+  roles:
+    - webserver
+
   
