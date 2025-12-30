@@ -1,14 +1,24 @@
 ---
-- hosts: all
-  name: Include dynamic variables
-  become: yes
-  tasks:
-    - include_tasks: ../dynamic-assignments/env-vars.yml
-      tags:
-        - always
+# site.yml - main orchestrator playbook
 
+# 1. Include dynamic environment variables
+#- hosts: all
+  #name: Include dynamic variables
+  #become: yes
+  #tasks:
+    #- include_tasks: ../dynamic-assignments/env-vars.yml
+      #tags:
+        #- always
+
+# 2. Run common tasks for all servers
 - import_playbook: ../static-assignments/common.yml
 
+# 3. Deploy UAT webservers
 - import_playbook: ../static-assignments/uat-webservers.yml
 
-- import_playbook: ../static-assignments/loadbalancers.yml 
+# 4. Deploy load balancers only if required
+#- import_playbook: ../static-assignments/loadbalancers.yml
+#  when: load_balancer_is_required | bool
+
+# 5. Deploy database servers
+#- import_playbook: ../static-assignments/db-servers.yml
