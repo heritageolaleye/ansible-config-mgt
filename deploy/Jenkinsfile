@@ -17,7 +17,7 @@ pipeline {
                 sshagent(credentials: ['ansible-ssh-key']) {
                     sh '''
                       ansible-playbook \
-                      -i inventory/hosts \
+                      -i inventory/ci/hosts \
                       playbooks/site.yml
                     '''
                 }
