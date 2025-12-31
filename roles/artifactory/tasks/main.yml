@@ -1,0 +1,56 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Install OpenJDK 8
+  ansible.builtin.apt:
+    name: openjdk-8-jdk
+    state: present
+
+- name: Install unzip utility
+  ansible.builtin.apt:
+    name: unzip
+    state: present
+
+- name: Download Artifactory OSS ZIP
+  ansible.builtin.get_url:
+    url: "https://jfrog.bintray.com/artifactory/jfrog-artifactory-oss-6.9.6.zip"
+    dest: "/tmp/jfrog-artifactory-oss-6.9.6.zip"
+    mode: "0644"
+
+- name: Ensure install directory exists
+  ansible.builtin.file:
+    path: "/opt"
+    state: directory
+
+- name: Unzip Artifactory archive
+  ansible.builtin.unarchive:
+    src: "/tmp/jfrog-artifactory-oss-6.9.6.zip"
+    dest: "/opt"
+    remote_src: yes
+
+- name: Make artifactory.sh executable
+  ansible.builtin.file:
+    path: "/opt/artifactory-oss-6.9.6/bin/artifactory.sh"
+    mode: "0755"
+
+- name: Start Artifactory
+  ansible.builtin.shell: |
+    nohup /opt/artifactory-oss-6.9.6/bin/artifactory.sh start > /tmp/artifactory-start.log 2>&1 &
+  args:
+    chdir: "/opt/artifactory-oss-6.9.6"
+
+- name: Wait for Artifactory port 8081
+  ansible.builtin.wait_for:
+    port: 8081
+    host: "{{ ansible_default_ipv4.address }}"
+    timeout: 60
+    state: started
+
+
+
+
+
+
+
