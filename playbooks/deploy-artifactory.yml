@@ -1,0 +1,6 @@
+---
+- name: Deploy Artifactory
+  hosts: artifactory         # or the group in your inventory where Artifactory should run
+  become: yes
+  roles:
+    - artifactory
