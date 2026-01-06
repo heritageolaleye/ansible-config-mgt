@@ -31,6 +31,9 @@ pipeline {
                     # Install all dependencies including require-dev
                     composer install --no-interaction --prefer-dist
 
+                    # Install PHPLoc as dev dependency (ignore if already installed)
+                    composer require --dev phploc/phploc --no-interaction || true
+
                     # Generate app key
                     php artisan key:generate
 
@@ -66,7 +69,7 @@ pipeline {
                     chmod -R 777 build/logs
 
                     # Run PHPLoc
-                    ./vendor/bin/phploc app/ --log-csv build/logs/phploc.csv
+                    ./vendor/bin/phploc app/ --log-csv build/logs/phploc.csv || echo "PHPLoc failed, continuing..."
                 '''
             }
         }
@@ -125,3 +128,4 @@ pipeline {
         }
     }
 }
+
