@@ -18,6 +18,8 @@ pipeline {
             steps {
                 sh '''
                     mv .env.sample .env || true
+                    mkdir -p bootstrap/cache
+                    chmod -R 775 bootstrap/cache
                     composer install
                     php artisan key:generate
                     php artisan migrate --force
