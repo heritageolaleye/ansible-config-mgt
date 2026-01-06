@@ -17,11 +17,26 @@ pipeline {
         stage('Prepare Dependencies') {
             steps {
                 sh '''
-                    mv .env.sample .env || true
+                    # Copy .env if it doesn't exist
+                    cp .env.sample .env || true
+
+                    # Ensure storage and cache directories exist
                     mkdir -p bootstrap/cache
-                    chmod -R 775 bootstrap/cache
-                    composer install
+                    mkdir -p storage/framework/{sessions,views,cache} storage/logs
+                    chmod -R 775 storage bootstrap/cache
+                    chown -R www-data:www-data storage bootstrap/cache || true
+
+                    # Install dependencies
+                    composer install --no-interaction
+
+                    # Generate app key
                     php artisan key:generate
+
+                    # Clear caches
+                    php artisan config:clear
+                    php artisan cache:clear
+
+                    # Run migrations & seed database
                     php artisan migrate --force
                     php artisan db:seed --force
                 '''
@@ -95,3 +110,4 @@ pipeline {
         }
     }
 }
+
