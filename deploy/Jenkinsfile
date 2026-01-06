@@ -46,6 +46,9 @@ pipeline {
         stage('Execute Unit Tests') {
             steps {
                 sh '''
+                    export SESSION_DRIVER=array
+                    export CACHE_DRIVER=array
+                    export QUEUE_CONNECTION=sync
                     mkdir -p storage/framework/{sessions,views,cache}
                     chmod -R 777 storage/framework
                     ./vendor/bin/phpunit
