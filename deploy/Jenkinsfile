@@ -27,37 +27,22 @@ pipeline {
         stage('Prepare Dependencies') {
             steps {
                 sh '''
+                    # Copy env file if not exists
                     cp .env.sample .env || true
 
+                    # Ensure storage directories exist
                     mkdir -p bootstrap/cache
                     mkdir -p storage/framework/{sessions,views,cache}
                     mkdir -p storage/logs
-                    chmod -R 777 storage
 
+                    # Fix permissions for CI
+                    chmod -R 777 storage bootstrap/cache
+
+                    # Composer install existing dependencies only
                     composer config audit.block-insecure false
+                    composer install --no-interaction --prefer-dist --ignore-platform-reqs
 
-                    # Install existing dependencies
-                    composer install \
-                        --no-interaction \
-                        --prefer-dist \
-                        --ignore-platform-reqs
-
-                    # Force legacy-compatible dev dependencies
-                    composer require --dev \
-                        phpunit/phpunit:4.8.* \
-                        sebastian/comparator:1.2.4 \
-                        phploc/phploc:2.* \
-                        --no-interaction \
-                        --no-update
-
-                    # Update ONLY the pinned packages
-                    composer update \
-                        phpunit/phpunit \
-                        sebastian/comparator \
-                        phploc/phploc \
-                        --no-interaction \
-                        --prefer-dist
-
+                    # Laravel setup
                     php artisan key:generate
                     php artisan config:clear
                     php artisan cache:clear
@@ -70,6 +55,7 @@ pipeline {
         stage('Execute Unit Tests') {
             steps {
                 sh '''
+                    export APP_ENV=testing
                     export SESSION_DRIVER=array
                     export CACHE_DRIVER=array
                     export QUEUE_CONNECTION=sync
@@ -88,9 +74,19 @@ pipeline {
                     mkdir -p build/logs
                     chmod -R 777 build/logs
 
-                    ./vendor/bin/phploc app/ \
-                        --log-csv build/logs/phploc.csv || true
+                    ./vendor/bin/phploc app/ --log-csv build/logs/phploc.csv || true
                 '''
+            }
+        }
+
+        stage('SonarQube Quality Gate') {
+            environment {
+                scannerHome = tool 'SonarQubeScanner'
+            }
+            steps {
+                withSonarQubeEnv('sonarqube') {
+                    sh "${scannerHome}/bin/sonar-scanner"
+                }
             }
         }
 
@@ -105,7 +101,6 @@ pipeline {
             steps {
                 script {
                     def server = Artifactory.server('artifactory-server')
-
                     def uploadSpec = """{
                         "files": [
                             {
@@ -115,7 +110,6 @@ pipeline {
                             }
                         ]
                     }"""
-
                     server.upload spec: uploadSpec
                 }
             }
@@ -129,21 +123,10 @@ pipeline {
                 build job: 'ansible-config-mgt/master',
                     parameters: [
                         string(name: 'env', value: 'dev'),
-                        booleanParam(name: 'DEPLOY_TO_DEV', value: false)
+                        booleanParam(name: 'DEPLOY_FROM_CI', value: true)
                     ],
                     wait: true,
                     propagate: false
-            }
-        }
-
-        stage('SonarQube Quality Gate') {
-            environment {
-                scannerHome = tool 'SonarQubeScanner'
-            }
-            steps {
-                withSonarQubeEnv('sonarqube') {
-                    sh "${scannerHome}/bin/sonar-scanner"
-                }
             }
         }
     }
@@ -154,5 +137,3 @@ pipeline {
         }
     }
 }
-
-
