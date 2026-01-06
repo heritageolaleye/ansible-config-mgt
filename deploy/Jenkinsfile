@@ -10,6 +10,7 @@ pipeline {
     }
 
     stages {
+
         stage("Initial cleanup") {
             steps {
                 deleteDir()
@@ -18,7 +19,8 @@ pipeline {
 
         stage('Checkout SCM') {
             steps {
-                git branch: 'main', url: 'https://github.com/heritageolaleye/php-todo.git'
+                git branch: 'main',
+                    url: 'https://github.com/heritageolaleye/php-todo.git'
             }
         }
 
@@ -26,13 +28,35 @@ pipeline {
             steps {
                 sh '''
                     cp .env.sample .env || true
+
                     mkdir -p bootstrap/cache
-                    mkdir -p storage/framework/{sessions,views,cache} storage/logs
+                    mkdir -p storage/framework/{sessions,views,cache}
+                    mkdir -p storage/logs
                     chmod -R 777 storage
 
                     composer config audit.block-insecure false
-                    composer install --no-interaction --prefer-dist
-                    composer require --dev phploc/phploc --no-interaction || true
+
+                    # Install existing dependencies
+                    composer install \
+                        --no-interaction \
+                        --prefer-dist \
+                        --ignore-platform-reqs
+
+                    # Force legacy-compatible dev dependencies
+                    composer require --dev \
+                        phpunit/phpunit:4.8.* \
+                        sebastian/comparator:1.2.4 \
+                        phploc/phploc:2.* \
+                        --no-interaction \
+                        --no-update
+
+                    # Update ONLY the pinned packages
+                    composer update \
+                        phpunit/phpunit \
+                        sebastian/comparator \
+                        phploc/phploc \
+                        --no-interaction \
+                        --prefer-dist
 
                     php artisan key:generate
                     php artisan config:clear
@@ -49,8 +73,10 @@ pipeline {
                     export SESSION_DRIVER=array
                     export CACHE_DRIVER=array
                     export QUEUE_CONNECTION=sync
+
                     mkdir -p storage/framework/{sessions,views,cache}
                     chmod -R 777 storage/framework
+
                     ./vendor/bin/phpunit
                 '''
             }
@@ -61,7 +87,9 @@ pipeline {
                 sh '''
                     mkdir -p build/logs
                     chmod -R 777 build/logs
-                    ./vendor/bin/phploc app/ --log-csv build/logs/phploc.csv || true
+
+                    ./vendor/bin/phploc app/ \
+                        --log-csv build/logs/phploc.csv || true
                 '''
             }
         }
@@ -76,16 +104,18 @@ pipeline {
         stage('Upload Artifact to Artifactory') {
             steps {
                 script {
-                    def server = Artifactory.server 'artifactory-server'
+                    def server = Artifactory.server('artifactory-server')
+
                     def uploadSpec = """{
                         "files": [
                             {
                                 "pattern": "php-todo.zip",
-                                "target": "php-todo-local/php-todo",
+                                "target": "php-todo-local/php-todo/",
                                 "props": "type=zip;status=ready"
                             }
                         ]
                     }"""
+
                     server.upload spec: uploadSpec
                 }
             }
@@ -97,12 +127,12 @@ pipeline {
             }
             steps {
                 build job: 'ansible-config-mgt/master',
-                      parameters: [
-                          string(name: 'env', value: 'dev'),
-                          booleanParam(name: 'DEPLOY_TO_DEV', value: false)
-                      ],
-                      wait: true,
-                      propagate: false
+                    parameters: [
+                        string(name: 'env', value: 'dev'),
+                        booleanParam(name: 'DEPLOY_TO_DEV', value: false)
+                    ],
+                    wait: true,
+                    propagate: false
             }
         }
 
@@ -124,4 +154,5 @@ pipeline {
         }
     }
 }
+
 
