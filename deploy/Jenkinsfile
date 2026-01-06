@@ -23,8 +23,7 @@ pipeline {
                     # Ensure storage and cache directories exist
                     mkdir -p bootstrap/cache
                     mkdir -p storage/framework/{sessions,views,cache} storage/logs
-                    chmod -R 775 storage bootstrap/cache
-                    chown -R www-data:www-data storage bootstrap/cache || true
+                    chmod -R 777 storage
 
                     # Install dependencies
                     composer install --no-interaction
@@ -45,7 +44,11 @@ pipeline {
 
         stage('Execute Unit Tests') {
             steps {
-                sh './vendor/bin/phpunit'
+                sh '''
+                    mkdir -p storage/framework/sessions
+                    chmod -R 777 storage/framework/sessions
+                    ./vendor/bin/phpunit
+                '''
             }
         }
 
@@ -110,4 +113,3 @@ pipeline {
         }
     }
 }
-
