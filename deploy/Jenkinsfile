@@ -1,6 +1,14 @@
 pipeline {
     agent any
 
+    parameters {
+        booleanParam(
+            name: 'DEPLOY_TO_DEV',
+            defaultValue: false,
+            description: 'Deploy application to Dev environment'
+        )
+    }
+
     stages {
         stage("Initial cleanup") {
             steps {
@@ -17,31 +25,18 @@ pipeline {
         stage('Prepare Dependencies') {
             steps {
                 sh '''
-                    # Copy .env if it doesn't exist
                     cp .env.sample .env || true
-
-                    # Ensure storage and cache directories exist
                     mkdir -p bootstrap/cache
                     mkdir -p storage/framework/{sessions,views,cache} storage/logs
                     chmod -R 777 storage
 
-                    # Disable Composer audit security block
                     composer config audit.block-insecure false
-
-                    # Install all dependencies including require-dev
                     composer install --no-interaction --prefer-dist
-
-                    # Install PHPLoc as dev dependency (ignore if already installed)
                     composer require --dev phploc/phploc --no-interaction || true
 
-                    # Generate app key
                     php artisan key:generate
-
-                    # Clear caches
                     php artisan config:clear
                     php artisan cache:clear
-
-                    # Run migrations & seed database
                     php artisan migrate --force
                     php artisan db:seed --force
                 '''
@@ -51,11 +46,8 @@ pipeline {
         stage('Execute Unit Tests') {
             steps {
                 sh '''
-                    # Ensure session directories exist before running tests
-                    mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache
+                    mkdir -p storage/framework/{sessions,views,cache}
                     chmod -R 777 storage/framework
-
-                    # Run PHPUnit from vendor/bin
                     ./vendor/bin/phpunit
                 '''
             }
@@ -64,12 +56,9 @@ pipeline {
         stage('Code Analysis') {
             steps {
                 sh '''
-                    # Ensure PHPLoc can write log
                     mkdir -p build/logs
                     chmod -R 777 build/logs
-
-                    # Run PHPLoc
-                    ./vendor/bin/phploc app/ --log-csv build/logs/phploc.csv || echo "PHPLoc failed, continuing..."
+                    ./vendor/bin/phploc app/ --log-csv build/logs/phploc.csv || true
                 '''
             }
         }
@@ -100,13 +89,17 @@ pipeline {
         }
 
         stage('Deploy to Dev Environment') {
+            when {
+                expression { params.DEPLOY_TO_DEV == true }
+            }
             steps {
                 build job: 'ansible-config-mgt/master',
                       parameters: [
-                          [$class: 'StringParameterValue', name: 'env', value: 'dev']
+                          string(name: 'env', value: 'dev'),
+                          booleanParam(name: 'DEPLOY_TO_DEV', value: false)
                       ],
-                      propagate: false,
-                      wait: true
+                      wait: true,
+                      propagate: false
             }
         }
 
