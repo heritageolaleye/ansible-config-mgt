@@ -1,40 +1,95 @@
 pipeline {
     agent any
 
-    // 1️⃣ Parameterize the environment/inventory
-    parameters {
-        string(
-            name: 'inventory', 
-            defaultValue: 'dev',  
-            description: 'This is the inventory file for the environment to deploy configuration'
-        )
-    }
-
-    // 2️⃣ Set environment variables
-    environment {
-        ANSIBLE_CONFIG = "${WORKSPACE}/ansible.cfg"
-        ANSIBLE_HOST_KEY_CHECKING = 'False'
-    }
-
     stages {
-        // 3️⃣ Checkout code
-        stage('Checkout') {
+        stage("Initial cleanup") {
             steps {
-                checkout scm
+                deleteDir()
             }
         }
 
-        // 4️⃣ Run Ansible Playbook with dynamic inventory
-        stage('Run Ansible Playbook') {
+        stage('Checkout SCM') {
             steps {
-                sshagent(credentials: ['ansible-ssh-key']) {
-                    sh """
-                      ansible-playbook \
-                        -i inventory/\${inventory}/hosts \
-                        playbooks/site.yml
-                    """
+                git branch: 'main', url: 'https://github.com/heritageolaleye/php-todo.git'
+            }
+        }
+
+        stage('Prepare Dependencies') {
+            steps {
+                sh '''
+                    mv .env.sample .env || true
+                    composer install
+                    php artisan key:generate
+                    php artisan migrate --force
+                    php artisan db:seed --force
+                '''
+            }
+        }
+
+        stage('Execute Unit Tests') {
+            steps {
+                sh './vendor/bin/phpunit'
+            }
+        }
+
+        stage('Code Analysis') {
+            steps {
+                sh 'mkdir -p build/logs'
+                sh 'phploc app/ --log-csv build/logs/phploc.csv'
+            }
+        }
+
+        stage('Package Artifact') {
+            steps {
+                sh 'zip -qr php-todo.zip ${WORKSPACE}/*'
+                archiveArtifacts artifacts: 'php-todo.zip', fingerprint: true
+            }
+        }
+
+        stage('Upload Artifact to Artifactory') {
+            steps {
+                script {
+                    def server = Artifactory.server 'artifactory-server'
+                    def uploadSpec = """{
+                        "files": [
+                            {
+                                "pattern": "php-todo.zip",
+                                "target": "php-todo-local/php-todo",
+                                "props": "type=zip;status=ready"
+                            }
+                        ]
+                    }"""
+                    server.upload spec: uploadSpec
                 }
             }
+        }
+
+        stage('Deploy to Dev Environment') {
+            steps {
+                build job: 'ansible-config-mgt/master',
+                      parameters: [
+                          [$class: 'StringParameterValue', name: 'env', value: 'dev']
+                      ],
+                      propagate: false,
+                      wait: true
+            }
+        }
+
+        stage('SonarQube Quality Gate') {
+            environment {
+                scannerHome = tool 'SonarQubeScanner'
+            }
+            steps {
+                withSonarQubeEnv('sonarqube') {
+                    sh "${scannerHome}/bin/sonar-scanner"
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
         }
     }
 }
