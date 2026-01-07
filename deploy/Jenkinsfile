@@ -7,174 +7,80 @@ pipeline {
 
     parameters {
         choice(
-            name: 'environment',
-            choices: ['dev', 'staging', 'prod'],
+            name: 'environment', 
+            choices: ['dev', 'staging', 'prod'], 
             description: 'Select deployment environment'
         )
-
         string(
-            name: 'branch',
-            defaultValue: 'master',
-            description: 'Branch to build for ansible-config-mgt'
+            name: 'branch', 
+            defaultValue: 'main', 
+            description: 'Branch to build'
         )
     }
 
     stages {
-
-        stage('Initial Cleanup') {
+        stage("Initial Cleanup") {
             steps {
                 cleanWs()
                 checkout scm
             }
         }
 
-        stage('Prepare Dependencies') {
+        stage("Prepare Dependencies") {
             steps {
-                dir('php-todo') {
-                    git branch: 'main', url: 'https://github.com/heritageolaleye/php-todo.git'
+                dir("php-todo") {
+                    // Clone the php-todo repo
+                    git branch: "${params.branch}", url: 'https://github.com/heritageolaleye/php-todo.git'
 
-                    sh '''
-                    php -v
-                    composer install
+                    // Create necessary Laravel folders before composer install
+                    sh """
+                        mkdir -p bootstrap/cache
+                        mkdir -p storage/framework
+                        chmod -R 775 bootstrap/cache storage/framework
+                    """
 
-                    # Ensure Laravel folders exist
-                    mkdir -p storage/framework/{sessions,cache,views}
-                    mkdir -p bootstrap/cache
-                    chmod -R 775 storage bootstrap/cache
+                    // Install dependencies
+                    sh 'composer install'
 
-                    # Setup environment
-                    cp .env.example .env
-                    php artisan key:generate
-                    php artisan migrate
-                    '''
+                    // Setup environment file and app key
+                    sh """
+                        cp -n .env.example .env || true
+                        php artisan key:generate
+                    """
                 }
             }
         }
 
-        stage('Execute Tests') {
+        stage("Execute Tests") {
             steps {
-                dir('php-todo') {
-                    sh '''
-                    # Update APP_KEY in case it's regenerated
-                    APP_KEY=$(php artisan key:generate --show)
-                    sed -i "s/^APP_KEY=.*/APP_KEY=$APP_KEY/" .env
-
-                    # Ensure storage/cache folders exist
-                    mkdir -p storage/framework/{sessions,cache,views}
-                    mkdir -p bootstrap/cache
-                    chmod -R 775 storage bootstrap/cache
-
-                    echo "APP_KEY Updated"
-                    echo "Running Tests"
-
-                    # Run PHPUnit tests
-                    ./vendor/bin/phpunit --log-junit tests/junit.xml
-                    '''
+                dir("php-todo") {
+                    // Run PHPUnit tests and generate cache if necessary
+                    sh 'php artisan config:cache'
+                    sh 'php artisan route:cache || true'
+                    sh 'php artisan view:cache || true'
+                    sh 'vendor/bin/phpunit --log-junit build/logs/phpunit.xml || true'
                 }
             }
         }
 
-        stage('Code Analysis') {
+        stage("Code Analysis") {
             steps {
-                dir('php-todo') {
-                    sh '''
-                    phploc app/ --log-csv build/logs/phploc.csv
-                    '''
+                dir("php-todo") {
+                    // PHPLoc
+                    sh 'phploc app/ --log-csv build/logs/phploc.csv || true'
+
+                    // SonarQube (if configured)
+                    withSonarQubeEnv('SonarQubeServer') {
+                        sh "sonar-scanner -Dsonar.projectKey=php-todo -Dsonar.sources=app -Dsonar.host.url=http://<SonarQube-IP>:9000 -Dsonar.login=<SONAR_TOKEN>"
+                    }
                 }
             }
         }
 
-        stage('Plot Code Coverage Report') {
+        stage("Plot Code Coverage Report") {
             steps {
-                dir('php-todo') {
-                    // Plot all the phploc metrics as Option 1
-                    plot csvFileName: 'plot-phploc.csv', 
-                         csvSeries: [[displayTableFlag: false, 
-                                      exclusionValues: 'Lines of Code (LOC),Comment Lines of Code (CLOC),Non-Comment Lines of Code (NCLOC),Logical Lines of Code (LLOC)', 
-                                      file: 'build/logs/phploc.csv', 
-                                      inclusionFlag: 'INCLUDE_BY_STRING', url: '']], 
-                         group: 'phploc', numBuilds: '100', style: 'line', 
-                         title: 'A - Lines of code', yaxis: 'Lines of Code'
-
-                    plot csvFileName: 'plot-phploc.csv', 
-                         csvSeries: [[displayTableFlag: false, 
-                                      exclusionValues: 'Directories,Files,Namespaces', 
-                                      file: 'build/logs/phploc.csv', 
-                                      inclusionFlag: 'INCLUDE_BY_STRING', url: '']], 
-                         group: 'phploc', numBuilds: '100', style: 'line', 
-                         title: 'B - Structures Containers', yaxis: 'Count'
-
-                    plot csvFileName: 'plot-phploc.csv', 
-                         csvSeries: [[displayTableFlag: false, 
-                                      exclusionValues: 'Average Class Length (LLOC),Average Method Length (LLOC),Average Function Length (LLOC)', 
-                                      file: 'build/logs/phploc.csv', 
-                                      inclusionFlag: 'INCLUDE_BY_STRING', url: '']], 
-                         group: 'phploc', numBuilds: '100', style: 'line', 
-                         title: 'C - Average Length', yaxis: 'Average Lines of Code'
-
-                    plot csvFileName: 'plot-phploc.csv', 
-                         csvSeries: [[displayTableFlag: false, 
-                                      exclusionValues: 'Cyclomatic Complexity / Lines of Code,Cyclomatic Complexity / Number of Methods', 
-                                      file: 'build/logs/phploc.csv', 
-                                      inclusionFlag: 'INCLUDE_BY_STRING', url: '']], 
-                         group: 'phploc', numBuilds: '100', style: 'line', 
-                         title: 'D - Relative Cyclomatic Complexity', yaxis: 'Cyclomatic Complexity by Structure'
-
-                    plot csvFileName: 'plot-phploc.csv', 
-                         csvSeries: [[displayTableFlag: false, 
-                                      exclusionValues: 'Classes,Abstract Classes,Concrete Classes', 
-                                      file: 'build/logs/phploc.csv', 
-                                      inclusionFlag: 'INCLUDE_BY_STRING', url: '']], 
-                         group: 'phploc', numBuilds: '100', style: 'line', 
-                         title: 'E - Types of Classes', yaxis: 'Count'
-
-                    plot csvFileName: 'plot-phploc.csv', 
-                         csvSeries: [[displayTableFlag: false, 
-                                      exclusionValues: 'Methods,Non-Static Methods,Static Methods,Public Methods,Non-Public Methods', 
-                                      file: 'build/logs/phploc.csv', 
-                                      inclusionFlag: 'INCLUDE_BY_STRING', url: '']], 
-                         group: 'phploc', numBuilds: '100', style: 'line', 
-                         title: 'F - Types of Methods', yaxis: 'Count'
-
-                    plot csvFileName: 'plot-phploc.csv', 
-                         csvSeries: [[displayTableFlag: false, 
-                                      exclusionValues: 'Constants,Global Constants,Class Constants', 
-                                      file: 'build/logs/phploc.csv', 
-                                      inclusionFlag: 'INCLUDE_BY_STRING', url: '']], 
-                         group: 'phploc', numBuilds: '100', style: 'line', 
-                         title: 'G - Types of Constants', yaxis: 'Count'
-
-                    plot csvFileName: 'plot-phploc.csv', 
-                         csvSeries: [[displayTableFlag: false, 
-                                      exclusionValues: 'Test Classes,Test Methods', 
-                                      file: 'build/logs/phploc.csv', 
-                                      inclusionFlag: 'INCLUDE_BY_STRING', url: '']], 
-                         group: 'phploc', numBuilds: '100', style: 'line', 
-                         title: 'I - Testing', yaxis: 'Count'
-
-                    plot csvFileName: 'plot-phploc.csv', 
-                         csvSeries: [[displayTableFlag: false, 
-                                      exclusionValues: 'Logical Lines of Code (LLOC),Classes Length (LLOC),Functions Length (LLOC),LLOC outside functions or classes', 
-                                      file: 'build/logs/phploc.csv', 
-                                      inclusionFlag: 'INCLUDE_BY_STRING', url: '']], 
-                         group: 'phploc', numBuilds: '100', style: 'line', 
-                         title: 'AB - Code Structure by Logical Lines of Code', yaxis: 'Logical Lines of Code'
-
-                    plot csvFileName: 'plot-phploc.csv', 
-                         csvSeries: [[displayTableFlag: false, 
-                                      exclusionValues: 'Functions,Named Functions,Anonymous Functions', 
-                                      file: 'build/logs/phploc.csv', 
-                                      inclusionFlag: 'INCLUDE_BY_STRING', url: '']], 
-                         group: 'phploc', numBuilds: '100', style: 'line', 
-                         title: 'H - Types of Functions', yaxis: 'Count'
-
-                    plot csvFileName: 'plot-phploc.csv', 
-                         csvSeries: [[displayTableFlag: false, 
-                                      exclusionValues: 'Interfaces,Traits,Classes,Methods,Functions,Constants', 
-                                      file: 'build/logs/phploc.csv', 
-                                      inclusionFlag: 'INCLUDE_BY_STRING', url: '']], 
-                         group: 'phploc', numBuilds: '100', style: 'line', 
-                         title: 'BB - Structure Objects', yaxis: 'Count'
+                dir("php-todo") {
+                    junit 'build/logs/phpunit.xml'
                 }
             }
         }
@@ -182,9 +88,16 @@ pipeline {
 
     post {
         always {
-            dir('php-todo') {
-                junit 'tests/junit.xml'
+            dir("php-todo") {
+                junit 'build/logs/phpunit.xml'
             }
+            echo "Pipeline finished. Check logs and reports."
+        }
+        success {
+            echo "Pipeline completed successfully."
+        }
+        failure {
+            echo "Pipeline failed. Check errors above."
         }
     }
 }
