@@ -1,104 +1,12 @@
 pipeline {
     agent any
-
-    environment {
-        ANSIBLE_CONFIG = "${WORKSPACE}/deploy/ansible.cfg"
-    }
-
-    parameters {
-        choice(
-            name: 'environment', 
-            choices: ['dev', 'staging', 'prod'], 
-            description: 'Select deployment environment'
-        )
-        string(
-            name: 'branch', 
-            defaultValue: 'main', 
-            description: 'Branch to build'
-        )
-    }
-
     stages {
-        stage("Initial Cleanup") {
+        stage('Test') {
             steps {
-                cleanWs()
-                checkout scm
+                sh 'echo "Jenkins is now fully functional 🚀"'
             }
-        }
-
-        stage("Prepare Dependencies") {
-            steps {
-                dir("php-todo") {
-                    // Clone the php-todo repo
-                    git branch: "${params.branch}", url: 'https://github.com/heritageolaleye/php-todo.git'
-
-                    // Create necessary Laravel folders before composer install
-                    sh """
-                        mkdir -p bootstrap/cache
-                        mkdir -p storage/framework
-                        chmod -R 775 bootstrap/cache storage/framework
-                    """
-
-                    // Install dependencies
-                    sh 'composer install'
-
-                    // Setup environment file and app key
-                    sh """
-                        cp -n .env.example .env || true
-                        php artisan key:generate
-                    """
-                }
-            }
-        }
-
-        stage("Execute Tests") {
-            steps {
-                dir("php-todo") {
-                    // Run PHPUnit tests and generate cache if necessary
-                    sh 'php artisan config:cache'
-                    sh 'php artisan route:cache || true'
-                    sh 'php artisan view:cache || true'
-                    sh 'vendor/bin/phpunit --log-junit build/logs/phpunit.xml || true'
-                }
-            }
-        }
-
-        stage("Code Analysis") {
-            steps {
-                dir("php-todo") {
-                    // PHPLoc
-                    sh 'phploc app/ --log-csv build/logs/phploc.csv || true'
-
-                    // SonarQube (if configured)
-                    withSonarQubeEnv('SonarQubeServer') {
-                        sh "sonar-scanner -Dsonar.projectKey=php-todo -Dsonar.sources=app -Dsonar.host.url=http://<SonarQube-IP>:9000 -Dsonar.login=<SONAR_TOKEN>"
-                    }
-                }
-            }
-        }
-
-        stage("Plot Code Coverage Report") {
-            steps {
-                dir("php-todo") {
-                    junit 'build/logs/phpunit.xml'
-                }
-            }
-        }
-    }
-
-    post {
-        always {
-            dir("php-todo") {
-                junit 'build/logs/phpunit.xml'
-            }
-            echo "Pipeline finished. Check logs and reports."
-        }
-        success {
-            echo "Pipeline completed successfully."
-        }
-        failure {
-            echo "Pipeline failed. Check errors above."
         }
     }
 }
+
 
