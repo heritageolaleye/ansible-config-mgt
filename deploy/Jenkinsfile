@@ -17,8 +17,7 @@ pipeline {
                     url: 'https://github.com/heritageolaleye/php-todo.git'
             }
         }
-
-        // Step 2: Install dependencies and prepare environment
+        
         stage('Install Dependencies') {
             steps {
                 sh '''
