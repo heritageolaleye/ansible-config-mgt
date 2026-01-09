@@ -1,0 +1,21 @@
+---
+- hosts: todo
+  become: yes
+  vars:
+    artifact_url: "http://35.232.243.226:8081/artifactory/php-todo-local/{{ artifact_version }}/php-todo.zip"
+    
+  tasks:
+    - name: Download artifact from Artifactory
+      get_url:
+        url: "{{ artifact_url }}" 
+        dest: "/tmp/php-todo.zip"
+        url_username: admin
+        url_password: "Aduragbemi12#"
+        mode: '0644'
+        validate_certs: no
+
+    - name: Unzip artifact
+      unarchive:
+        src: "/tmp/php-todo.zip"
+        dest: "/var/www/html"
+        remote_src: yes

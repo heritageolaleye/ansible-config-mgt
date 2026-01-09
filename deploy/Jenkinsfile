@@ -5,6 +5,11 @@ pipeline {
         timestamps()
     }
 
+    parameters {
+        string(name: 'branch', defaultValue: 'main', description: 'Branch to build')
+        choice(name: 'environment', choices: ['dev', 'qa', 'prod'], description: 'Target deployment environment')
+    }
+
     stages {
 
         // ===============================
@@ -21,7 +26,7 @@ pipeline {
         // ===============================
         stage('Checkout SCM') {
             steps {
-                git branch: 'main',
+                git branch: "${params.branch}",
                     credentialsId: 'github-token',
                     url: 'https://github.com/heritageolaleye/php-todo.git'
             }
@@ -203,7 +208,7 @@ pipeline {
                 script {
                     def server = Artifactory.server 'artifactory-server'
                     def uploadSpec = """{
-                        "files": [{
+                        "files": [ {
                             "pattern": "php-todo.zip",
                             "target": "php-todo-local/${BUILD_NUMBER}/",
                             "props": "BUILD_NUMBER=${BUILD_NUMBER};BRANCH=${params.branch}"
@@ -211,6 +216,25 @@ pipeline {
                     }"""
                     
                     server.upload spec: uploadSpec
+                }
+            }
+        }
+
+        // ===============================
+        // Step 9: Deploy to Environment
+        // ===============================
+        stage('Deploy to Environment') {
+            steps {
+                script {
+                    def playbook = "${WORKSPACE}/playbooks/deploy.yml"
+                    def inventory = "${WORKSPACE}/inventory/${params.environment}"
+                    
+                    ansiblePlaybook(
+                        playbook: playbook,
+                        inventory: inventory,
+                        extras: "-e \"artifact_version=${BUILD_NUMBER}\"",
+                        colorized: true
+                    )
                 }
             }
         }
@@ -223,6 +247,7 @@ pipeline {
         }
     }
 }
+
 
 
 
