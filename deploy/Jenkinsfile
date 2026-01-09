@@ -3,14 +3,18 @@ pipeline {
 
     stages {
 
+        // ===============================
         // Step 1: Cleanup workspace
+        // ===============================
         stage('Cleanup') {
             steps {
                 deleteDir()
             }
         }
 
-        // Step 2: Checkout code from GitHub
+        // ===============================
+        // Step 2: Checkout Source Code
+        // ===============================
         stage('Checkout SCM') {
             steps {
                 git branch: 'main',
@@ -19,15 +23,20 @@ pipeline {
             }
         }
 
-        // Step 3: Install dependencies and prepare environment
+        // ===============================
+        // Step 3: Install Dependencies
+        // ===============================
         stage('Install Dependencies') {
             steps {
                 sh '''
                 cp .env.sample .env || true
 
                 mkdir -p bootstrap/cache
-                mkdir -p storage/framework/{sessions,views,cache} storage/logs
-                chmod -R 777 storage bootstrap/cache
+                mkdir -p storage/framework/{sessions,views,cache}
+                mkdir -p storage/logs
+
+                sudo chown -R jenkins:jenkins storage bootstrap/cache
+                chmod -R 775 storage bootstrap/cache
 
                 composer install --no-interaction --prefer-dist
 
@@ -38,19 +47,33 @@ pipeline {
             }
         }
 
+        // ===============================
         // Step 4: Execute Unit Tests
+        // ===============================
         stage('Execute Unit Tests') {
             steps {
                 sh '''
                 mkdir -p storage/framework/{sessions,views,cache}
-                chmod -R 777 storage/framework
+                mkdir -p storage/logs
+
+                sudo chown -R jenkins:jenkins storage bootstrap/cache
+                chmod -R 775 storage bootstrap/cache
+
+                echo "SESSION_DRIVER=file" >> .env
+                echo "CACHE_DRIVER=file" >> .env
+                echo "QUEUE_DRIVER=sync" >> .env
+
+                php artisan config:clear
+                php artisan cache:clear
 
                 ./vendor/bin/phpunit
                 '''
             }
         }
 
-        // Step 5: Code Analysis using PHPLoc
+        // ===============================
+        // Step 5: PHPLoc Code Analysis
+        // ===============================
         stage('Code Analysis') {
             steps {
                 sh '''
@@ -65,30 +88,72 @@ pipeline {
             }
         }
 
-        // Step 6: Plot PHPLoc Historical Graphs
+        // ===============================
+        // Step 6: PHPLoc Historical Graphs
+        // ===============================
         stage('Plot Code Metrics') {
             steps {
+
                 plot csvFileName: 'phploc.csv',
-                     csvSeries: [[file: 'build/logs/phploc.csv']],
+                     csvSeries: [[file: 'build/logs/phploc.csv',
+                                  inclusionFlag: 'INCLUDE_BY_STRING',
+                                  exclusionValues: 'Lines of Code (LOC),Comment Lines of Code (CLOC),Non-Comment Lines of Code (NCLOC),Logical Lines of Code (LLOC)',
+                                  displayTableFlag: false]],
                      group: 'phploc',
+                     title: 'A - Lines of Code',
                      style: 'line',
-                     numBuilds: '100',
-                     title: 'PHPLoc – Historical Code Metrics',
-                     yaxis: 'Metrics'
+                     yaxis: 'Lines of Code',
+                     numBuilds: '100'
+
+                plot csvFileName: 'phploc.csv',
+                     csvSeries: [[file: 'build/logs/phploc.csv',
+                                  inclusionFlag: 'INCLUDE_BY_STRING',
+                                  exclusionValues: 'Directories,Files,Namespaces',
+                                  displayTableFlag: false]],
+                     group: 'phploc',
+                     title: 'B - Structures Containers',
+                     style: 'line',
+                     yaxis: 'Count',
+                     numBuilds: '100'
+
+                plot csvFileName: 'phploc.csv',
+                     csvSeries: [[file: 'build/logs/phploc.csv',
+                                  inclusionFlag: 'INCLUDE_BY_STRING',
+                                  exclusionValues: 'Classes,Abstract Classes,Concrete Classes',
+                                  displayTableFlag: false]],
+                     group: 'phploc',
+                     title: 'C - Types of Classes',
+                     style: 'line',
+                     yaxis: 'Count',
+                     numBuilds: '100'
+
+                plot csvFileName: 'phploc.csv',
+                     csvSeries: [[file: 'build/logs/phploc.csv',
+                                  inclusionFlag: 'INCLUDE_BY_STRING',
+                                  exclusionValues: 'Methods,Static Methods,Public Methods,Non-Public Methods',
+                                  displayTableFlag: false]],
+                     group: 'phploc',
+                     title: 'D - Types of Methods',
+                     style: 'line',
+                     yaxis: 'Count',
+                     numBuilds: '100'
             }
         }
 
+        // ===============================
         // Step 7: SonarQube Analysis (LAST)
+        // ===============================
         stage('SonarQube Analysis') {
+            environment {
+                scannerHome = tool 'SonarQubeScanner'
+            }
             steps {
                 withSonarQubeEnv('SonarQubeServer') {
                     sh '''
-                    sonar-scanner \
+                    ${scannerHome}/bin/sonar-scanner \
                       -Dsonar.projectKey=php-todo \
-                      -Dsonar.projectName=php-todo \
-                      -Dsonar.projectVersion=1.0 \
                       -Dsonar.sources=app \
-                      -Dsonar.language=php \
+                      -Dsonar.php.tests.reportPath=build/logs \
                       -Dsonar.sourceEncoding=UTF-8
                     '''
                 }
@@ -102,6 +167,7 @@ pipeline {
         }
     }
 }
+
 
 
 
