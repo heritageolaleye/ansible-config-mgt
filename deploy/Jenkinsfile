@@ -40,7 +40,6 @@ pipeline {
                 mkdir -p storage/logs
                 mkdir -p build/logs
 
-                # Remove sudo — Jenkins already owns workspace
                 chmod -R 775 storage bootstrap/cache
 
                 composer install --no-interaction --prefer-dist
@@ -185,6 +184,33 @@ pipeline {
                       -Dsonar.sources=app \
                       -Dsonar.sourceEncoding=UTF-8
                     '''
+                }
+            }
+        }
+
+        // ===============================
+        // Step 8: Package Application
+        // ===============================
+        stage('Package Application') {
+            steps {
+                sh '''
+                    zip -r php-todo.zip . \
+                        -x "vendor/*" \
+                        -x "node_modules/*" \
+                        -x ".git/*"
+                '''
+                
+                script {
+                    def server = Artifactory.server 'artifactory-server'
+                    def uploadSpec = """{
+                        "files": [{
+                            "pattern": "php-todo.zip",
+                            "target": "php-todo-local/${BUILD_NUMBER}/",
+                            "props": "BUILD_NUMBER=${BUILD_NUMBER};BRANCH=${params.branch}"
+                        }]
+                    }"""
+                    
+                    server.upload spec: uploadSpec
                 }
             }
         }
