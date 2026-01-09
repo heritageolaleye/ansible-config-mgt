@@ -61,8 +61,14 @@ pipeline {
         stage('Code Analysis') {
             steps {
                 sh '''
-                # Generate PHPLoc report using local dependency
                 mkdir -p build/logs
+
+                # Ensure PHPLoc exists, install if missing
+                if [ ! -f ./vendor/bin/phploc ]; then
+                    composer require --dev phploc/phploc
+                fi
+
+                # Run PHPLoc
                 ./vendor/bin/phploc app/ --log-csv build/logs/phploc.csv
                 '''
             }
@@ -75,6 +81,7 @@ pipeline {
         }
     }
 }
+
 
 
 
