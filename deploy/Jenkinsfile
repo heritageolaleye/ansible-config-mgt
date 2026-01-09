@@ -2,17 +2,44 @@ pipeline {
     agent any
 
     stages {
+        // Step 1: Cleanup workspace
         stage('Cleanup') {
             steps {
                 deleteDir()
             }
         }
 
+        // Step 1: Checkout code from GitHub
         stage('Checkout SCM') {
             steps {
                 git branch: 'main',
                     credentialsId: 'github-token',
                     url: 'https://github.com/heritageolaleye/php-todo.git'
+            }
+        }
+
+        // Step 2: Install dependencies and prepare environment
+        stage('Install Dependencies') {
+            steps {
+                sh '''
+                # Copy .env if missing
+                cp .env.sample .env || true
+
+                # Create storage and cache directories
+                mkdir -p bootstrap/cache
+                mkdir -p storage/framework/{sessions,views,cache} storage/logs
+                chmod -R 777 storage bootstrap/cache
+
+                # Install Composer dependencies
+                composer install --no-interaction --prefer-dist
+
+                # Generate app key
+                php artisan key:generate
+
+                # Clear Laravel caches
+                php artisan config:clear
+                php artisan cache:clear
+                '''
             }
         }
     }
