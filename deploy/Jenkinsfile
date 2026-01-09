@@ -40,7 +40,7 @@ pipeline {
                 mkdir -p storage/logs
                 mkdir -p build/logs
 
-                sudo chown -R jenkins:jenkins storage bootstrap/cache
+                # Remove sudo — Jenkins already owns workspace
                 chmod -R 775 storage bootstrap/cache
 
                 composer install --no-interaction --prefer-dist
@@ -90,8 +90,6 @@ pipeline {
         // ===============================
         stage('Plot Code Metrics') {
             steps {
-
-                // ---- A: Lines of Code ----
                 plot csvFileName: 'phploc_loc.csv',
                      csvSeries: [[
                         file: 'build/logs/phploc.csv',
@@ -105,7 +103,6 @@ pipeline {
                      yaxis: 'Lines',
                      numBuilds: '100'
 
-                // ---- B: Files & Directories ----
                 plot csvFileName: 'phploc_structure.csv',
                      csvSeries: [[
                         file: 'build/logs/phploc.csv',
@@ -119,7 +116,6 @@ pipeline {
                      yaxis: 'Count',
                      numBuilds: '100'
 
-                // ---- C: Classes ----
                 plot csvFileName: 'phploc_classes.csv',
                      csvSeries: [[
                         file: 'build/logs/phploc.csv',
@@ -133,7 +129,6 @@ pipeline {
                      yaxis: 'Count',
                      numBuilds: '100'
 
-                // ---- D: Methods ----
                 plot csvFileName: 'phploc_methods.csv',
                      csvSeries: [[
                         file: 'build/logs/phploc.csv',
@@ -147,7 +142,6 @@ pipeline {
                      yaxis: 'Count',
                      numBuilds: '100'
 
-                // ---- E: Functions & Constants ----
                 plot csvFileName: 'phploc_functions.csv',
                      csvSeries: [[
                         file: 'build/logs/phploc.csv',
@@ -161,7 +155,6 @@ pipeline {
                      yaxis: 'Count',
                      numBuilds: '100'
 
-                // ---- F: Dependencies ----
                 plot csvFileName: 'phploc_dependencies.csv',
                      csvSeries: [[
                         file: 'build/logs/phploc.csv',
@@ -178,7 +171,7 @@ pipeline {
         }
 
         // ===============================
-        // Step 7: SonarQube Analysis (LAST)
+        // Step 7: SonarQube Analysis
         // ===============================
         stage('SonarQube Analysis') {
             environment {
@@ -204,6 +197,7 @@ pipeline {
         }
     }
 }
+
 
 
 
