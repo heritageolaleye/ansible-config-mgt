@@ -30,7 +30,7 @@ pipeline {
                 mkdir -p storage/framework/{sessions,views,cache} storage/logs
                 chmod -R 777 storage bootstrap/cache
 
-                # Install Composer dependencies
+                # Install Composer dependencies including PHPLoc
                 composer install --no-interaction --prefer-dist
 
                 # Generate app key
@@ -57,13 +57,13 @@ pipeline {
             }
         }
 
-        // Step 5: Code Analysis
+        // Step 5: Code Analysis using local PHPLoc
         stage('Code Analysis') {
             steps {
                 sh '''
-                # Generate PHPLoc report
+                # Generate PHPLoc report using local dependency
                 mkdir -p build/logs
-                phploc app/ --log-csv build/logs/phploc.csv
+                ./vendor/bin/phploc app/ --log-csv build/logs/phploc.csv
                 '''
             }
         }
@@ -75,6 +75,7 @@ pipeline {
         }
     }
 }
+
 
 
 
