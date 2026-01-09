@@ -18,6 +18,7 @@ pipeline {
             }
         }
         
+        // Step 2: Install dependencies and prepare environment
         stage('Install Dependencies') {
             steps {
                 sh '''
@@ -40,6 +41,26 @@ pipeline {
                 php artisan cache:clear
                 '''
             }
+        }
+
+        // Step 3: Execute Unit Tests
+        stage('Execute Unit Tests') {
+            steps {
+                sh '''
+                # Ensure storage/framework directories exist
+                mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache
+                chmod -R 777 storage/framework
+
+                # Run PHPUnit tests
+                ./vendor/bin/phpunit
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs() // Clean workspace after build
         }
     }
 }
