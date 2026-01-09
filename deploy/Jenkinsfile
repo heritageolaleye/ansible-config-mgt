@@ -1,12 +1,22 @@
 pipeline {
     agent any
+
     stages {
-        stage('Test') {
+        stage('Cleanup') {
             steps {
-                sh 'echo "Jenkins is now fully functional 🚀"'
+                deleteDir()
+            }
+        }
+
+        stage('Checkout SCM') {
+            steps {
+                git branch: 'main',
+                    credentialsId: 'github-token',
+                    url: 'https://github.com/heritageolaleye/php-todo.git'
             }
         }
     }
 }
+
 
 
