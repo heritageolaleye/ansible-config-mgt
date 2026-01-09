@@ -9,7 +9,7 @@ pipeline {
             }
         }
 
-        // Step 1: Checkout code from GitHub
+        // Step 2: Checkout code from GitHub
         stage('Checkout SCM') {
             steps {
                 git branch: 'main',
@@ -18,7 +18,7 @@ pipeline {
             }
         }
         
-        // Step 2: Install dependencies and prepare environment
+        // Step 3: Install dependencies and prepare environment
         stage('Install Dependencies') {
             steps {
                 sh '''
@@ -43,7 +43,7 @@ pipeline {
             }
         }
 
-        // Step 3: Execute Unit Tests
+        // Step 4: Execute Unit Tests
         stage('Execute Unit Tests') {
             steps {
                 sh '''
@@ -56,6 +56,17 @@ pipeline {
                 '''
             }
         }
+
+        // Step 5: Code Analysis
+        stage('Code Analysis') {
+            steps {
+                sh '''
+                # Generate PHPLoc report
+                mkdir -p build/logs
+                phploc app/ --log-csv build/logs/phploc.csv
+                '''
+            }
+        }
     }
 
     post {
@@ -64,6 +75,7 @@ pipeline {
         }
     }
 }
+
 
 
 
