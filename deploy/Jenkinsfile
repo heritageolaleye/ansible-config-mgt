@@ -229,14 +229,12 @@ pipeline {
         // ===============================
         stage('Deploy to Environment') {
             steps {
-                dir("${WORKSPACE}/../ansible-config-mgt") { // Option 1: run in existing ansible repo
-                    ansiblePlaybook(
-                        playbook: "playbooks/deploy.yml",
-                        inventory: "inventory/${params.environment}/hosts.ini",
-                        extras: "-e artifact_version=${BUILD_NUMBER}",
-                        colorized: true
-                    )
-                }
+                ansiblePlaybook(
+                    playbook: "playbooks/deploy.yml",
+                    inventory: "inventory/${params.environment}/hosts.ini",
+                    extras: "-e artifact_version=${BUILD_NUMBER}",
+                    colorized: true
+                )
             }
         }
 
@@ -250,6 +248,7 @@ pipeline {
     }
 
 }
+
 
 
 
