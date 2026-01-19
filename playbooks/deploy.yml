@@ -1,4 +1,4 @@
-- hosts: sonarqube
+- hosts: todo
   become: yes
 
   vars:
@@ -12,6 +12,7 @@
         dest: "/tmp/php-todo.zip"
         url_username: admin
         url_password: "Aduragbemi12#"
+        force: yes
         mode: '0644'
         validate_certs: no
 

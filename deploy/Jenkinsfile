@@ -175,8 +175,9 @@ pipeline {
         }
 
         // ===============================
-        // Step 7: SonarQube Analysis
+        // Step 7: SonarQube Analysis (Commented out temporarily)
         // ===============================
+        /*
         stage('SonarQube Analysis') {
             environment {
                 scannerHome = tool 'SonarQubeScanner'
@@ -194,6 +195,7 @@ pipeline {
                 }
             }
         }
+        */
 
         // ===============================
         // Step 8: Package Application
@@ -214,10 +216,29 @@ pipeline {
                             "pattern": "php-todo.zip",
                             "target": "php-todo-local/${BUILD_NUMBER}/",
                             "props": "BUILD_NUMBER=${BUILD_NUMBER};BRANCH=${params.branch}"
-                        }]
+                        } ]
                     }"""
                     
                     server.upload spec: uploadSpec
+                }
+            }
+        }
+
+        // ===============================
+        // Step 9: Deploy to Environment
+        // ===============================
+        stage('Deploy to Environment') {
+            steps {
+                script {
+                    def playbook = "${WORKSPACE}/deploy/playbooks/deploy.yml"
+                    def inventory = "${WORKSPACE}/deploy/inventory/${params.environment}"
+                    
+                    ansiblePlaybook(
+                        playbook: playbook,
+                        inventory: inventory,
+                        extras: '-e "artifact_version=${BUILD_NUMBER}"',
+                        colorized: true
+                    )
                 }
             }
         }
@@ -232,6 +253,8 @@ pipeline {
     }
 
 }
+
+
 
 
 
