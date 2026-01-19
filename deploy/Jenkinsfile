@@ -175,29 +175,6 @@ pipeline {
         }
 
         // ===============================
-        // Step 7: SonarQube Analysis (Commented out temporarily)
-        // ===============================
-        /*
-        stage('SonarQube Analysis') {
-            environment {
-                scannerHome = tool 'SonarQubeScanner'
-            }
-            steps {
-                echo "SonarQube Scanner Path: ${scannerHome}"
-                withSonarQubeEnv('SonarQubeServer') {
-                    sh '''
-                    ${scannerHome}/bin/sonar-scanner \
-                      -Dsonar.projectKey=php-todo \
-                      -Dsonar.sources=. \
-                      -Dsonar.php.tests.reportPath=tests/junit.xml \
-                      -Dsonar.php.coverage.reportPaths=coverage.xml
-                    '''
-                }
-            }
-        }
-        */
-
-        // ===============================
         // Step 8: Package Application
         // ===============================
         stage('Package Application') {
@@ -229,12 +206,14 @@ pipeline {
         // ===============================
         stage('Deploy to Environment') {
             steps {
-                ansiblePlaybook(
-                    playbook: "playbooks/deploy.yml",
-                    inventory: "inventory/${params.environment}/hosts.ini",
-                    extras: "-e artifact_version=${BUILD_NUMBER}",
-                    colorized: true
-                )
+                dir("${WORKSPACE}/../ansible-config-mgt") {
+                    ansiblePlaybook(
+                        playbook: "playbooks/deploy.yml",
+                        inventory: "inventory/${params.environment}/hosts.ini",
+                        extras: "-e artifact_version=${BUILD_NUMBER}",
+                        colorized: true
+                    )
+                }
             }
         }
 
@@ -246,7 +225,6 @@ pipeline {
             cleanWs()
         }
     }
-
 }
 
 
