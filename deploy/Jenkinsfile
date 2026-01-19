@@ -231,8 +231,8 @@ pipeline {
             steps {
                 dir("${WORKSPACE}/../ansible-config-mgt") { // Option 1: run in existing ansible repo
                     ansiblePlaybook(
-                        playbook: "${WORKSPACE}/playbooks/deploy.yml",
-                        inventory: "${WORKSPACE}/inventory/${params.environment}/hosts.ini",
+                        playbook: "playbooks/deploy.yml",
+                        inventory: "inventory/${params.environment}/hosts.ini",
                         extras: "-e artifact_version=${BUILD_NUMBER}",
                         colorized: true
                     )
