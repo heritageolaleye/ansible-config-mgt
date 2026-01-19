@@ -1,0 +1,41 @@
+- hosts: sonarqube
+  become: yes
+
+  vars:
+    artifact_version: "{{ artifact_version }}"
+    artifact_url: "http://35.232.243.226:8081/artifactory/php-todo-local/{{ artifact_version }}/php-todo.zip"
+
+  tasks:
+    - name: Download artifact from Artifactory
+      get_url:
+        url: "{{ artifact_url }}"
+        dest: "/tmp/php-todo.zip"
+        url_username: admin
+        url_password: "Aduragbemi12#"
+        mode: '0644'
+        validate_certs: no
+
+    - name: Ensure Apache is installed
+      apt:
+        name: apache2
+        state: present
+        update_cache: yes
+
+    - name: Ensure web root exists
+      file:
+        path: /var/www/html
+        state: directory
+        mode: '0755'
+
+    - name: Remove old application (if any)
+      file:
+        path: /var/www/html/php-todo
+        state: absent
+
+    - name: Unzip application into web root
+      unarchive:
+        src: "/tmp/php-todo.zip"
+        dest: "/var/www/html/php-todo"
+        remote_src: yes
+
+
