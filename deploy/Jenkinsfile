@@ -175,7 +175,7 @@ pipeline {
         }
 
         // ===============================
-        // Step 8: Package Application
+        // Step 7: Package Application
         // ===============================
         stage('Package Application') {
             steps {
@@ -202,13 +202,26 @@ pipeline {
         }
 
         // ===============================
+        // Step 8: Checkout Ansible Repo
+        // ===============================
+        stage('Checkout Ansible Repo') {
+            steps {
+                dir('ansible-config-mgt') {
+                    git branch: 'master',
+                        credentialsId: 'github-token',
+                        url: 'https://github.com/heritageolaleye/ansible-config-mgt.git'
+                }
+            }
+        }
+
+        // ===============================
         // Step 9: Deploy to Environment
         // ===============================
         stage('Deploy to Environment') {
             steps {
-                dir("${WORKSPACE}/../ansible-config-mgt") {
+                dir('ansible-config-mgt') {
                     ansiblePlaybook(
-                        playbook: "playbooks/deploy.yml",
+                        playbook: 'playbooks/deploy.yml',
                         inventory: "inventory/${params.environment}/hosts.ini",
                         extras: "-e artifact_version=${BUILD_NUMBER}",
                         colorized: true
@@ -225,7 +238,9 @@ pipeline {
             cleanWs()
         }
     }
+
 }
+
 
 
 
