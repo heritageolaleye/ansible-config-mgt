@@ -94,6 +94,7 @@ pipeline {
         // ===============================
         stage('Plot Code Metrics') {
             steps {
+
                 plot csvFileName: 'phploc_loc.csv',
                      csvSeries: [[
                         file: 'build/logs/phploc.csv',
@@ -194,48 +195,45 @@ pipeline {
         }
 
         // ===============================
-        // Step 8: Package Application
+        // Step 8: Package & Upload Artifact
         // ===============================
         stage('Package Application') {
             steps {
                 sh '''
-                    zip -r php-todo.zip . \
-                        -x "vendor/*" \
-                        -x "node_modules/*" \
-                        -x ".git/*"
+                zip -r php-todo.zip . \
+                    -x "vendor/*" \
+                    -x "node_modules/*" \
+                    -x ".git/*"
                 '''
-                
+
                 script {
-                    def server = Artifactory.server 'artifactory-server'
+                    def server = Artifactory.server('artifactory-server')
+
                     def uploadSpec = """{
-                        "files": [ {
-                            "pattern": "php-todo.zip",
-                            "target": "php-todo-local/${BUILD_NUMBER}/",
-                            "props": "BUILD_NUMBER=${BUILD_NUMBER};BRANCH=${params.branch}"
-                        }]
+                        "files": [
+                            {
+                                "pattern": "php-todo.zip",
+                                "target": "php-todo-local/${BUILD_NUMBER}/php-todo.zip"
+                            }
+                        ]
                     }"""
-                    
+
                     server.upload spec: uploadSpec
                 }
             }
         }
 
         // ===============================
-        // Step 9: Deploy to Environment
+        // Step 9: Deploy using Ansible
         // ===============================
         stage('Deploy to Environment') {
             steps {
-                script {
-                    def playbook = "${WORKSPACE}/playbooks/deploy.yml"
-                    def inventory = "${WORKSPACE}/inventory/${params.environment}"
-                    
-                    ansiblePlaybook(
-                        playbook: playbook,
-                        inventory: inventory,
-                        extras: "-e \"artifact_version=${BUILD_NUMBER}\"",
-                        colorized: true
-                    )
-                }
+                ansiblePlaybook(
+                    playbook: "${WORKSPACE}/playbooks/deploy.yml",
+                    inventory: "${WORKSPACE}/inventory/${params.environment}",
+                    extras: "-e artifact_version=${BUILD_NUMBER}",
+                    colorized: true
+                )
             }
         }
     }
@@ -247,6 +245,7 @@ pipeline {
         }
     }
 }
+
 
 
 
