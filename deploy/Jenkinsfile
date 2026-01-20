@@ -195,7 +195,7 @@ pipeline {
                     withEnv(['ANSIBLE_HOST_KEY_CHECKING=False']) {
                         // Run playbook as ennoiaconcept
                         sh """
-                            sudo -E -u ennoiaconcept ansible-playbook playbooks/deploy.yml \
+                            sudo -u ennoiaconcept ansible-playbook playbooks/deploy.yml \
                                 -i inventory/${params.environment}/hosts.ini \
                                 -e artifact_version=${BUILD_NUMBER} \
                         """
