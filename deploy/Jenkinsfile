@@ -198,7 +198,6 @@ pipeline {
                             sudo -u ennoiaconcept ansible-playbook playbooks/deploy.yml \
                                 -i inventory/${params.environment}/hosts.ini \
                                 -e artifact_version=${BUILD_NUMBER} \
-                                --color
                         """
                     }
                 }
