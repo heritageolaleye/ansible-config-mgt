@@ -33,10 +33,21 @@
         path: /var/www/html/php-todo
         state: absent
 
+    - name: Ensure application folder exists
+      file:
+        path: /var/www/html/php-todo
+        state: directory
+        owner:www-data
+        group:www-data
+        mode: '0755'
+
     - name: Unzip application into web root
       unarchive:
         src: "/tmp/php-todo.zip"
         dest: "/var/www/html/php-todo"
         remote_src: yes
+        owner: www-data
+        group: www-data
+        mode: '0755'
 
 
