@@ -193,12 +193,13 @@ pipeline {
             steps {
                 dir('ansible-config-mgt') {
                     withEnv(['ANSIBLE_HOST_KEY_CHECKING=False']) {
-                        ansiblePlaybook(
-                            playbook: 'playbooks/deploy.yml',
-                            inventory: "inventory/${params.environment}/hosts.ini",
-                            extras: "-e artifact_version=${BUILD_NUMBER}",
-                            colorized: true
-                        )
+                        // Run playbook as ennoiaconcept
+                        sh """
+                            sudo -u ennoiaconcept ansible-playbook playbooks/deploy.yml \
+                                -i inventory/${params.environment}/hosts.ini \
+                                -e artifact_version=${BUILD_NUMBER} \
+                                --color
+                        """
                     }
                 }
             }
@@ -212,7 +213,6 @@ pipeline {
         }
     }
 }
-
 
 
 
