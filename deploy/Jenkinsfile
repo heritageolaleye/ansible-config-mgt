@@ -12,18 +12,12 @@ pipeline {
 
     stages {
 
-        // ===============================
-        // Step 1: Cleanup workspace
-        // ===============================
         stage('Cleanup') {
             steps {
                 deleteDir()
             }
         }
 
-        // ===============================
-        // Step 2: Checkout Source Code
-        // ===============================
         stage('Checkout SCM') {
             steps {
                 git branch: "${params.branch}",
@@ -32,9 +26,6 @@ pipeline {
             }
         }
 
-        // ===============================
-        // Step 3: Install Dependencies
-        // ===============================
         stage('Install Dependencies') {
             steps {
                 sh '''
@@ -56,9 +47,6 @@ pipeline {
             }
         }
 
-        // ===============================
-        // Step 4: Execute Unit Tests
-        // ===============================
         stage('Execute Unit Tests') {
             steps {
                 sh '''
@@ -74,9 +62,6 @@ pipeline {
             }
         }
 
-        // ===============================
-        // Step 5: PHPLoc Code Analysis
-        // ===============================
         stage('PHPLoc Analysis') {
             steps {
                 sh '''
@@ -89,9 +74,6 @@ pipeline {
             }
         }
 
-        // ===============================
-        // Step 6: PHPLoc Historical Graphs
-        // ===============================
         stage('Plot Code Metrics') {
             steps {
                 plot csvFileName: 'phploc_loc.csv',
@@ -174,36 +156,29 @@ pipeline {
             }
         }
 
-        // ===============================
-        // Step 7: Package Application
-        // ===============================
         stage('Package Application') {
             steps {
                 sh '''
-                    zip -r php-todo.zip . \
-                        -x "vendor/*" \
-                        -x "node_modules/*" \
-                        -x ".git/*"
+                zip -r php-todo.zip . \
+                    -x "vendor/*" \
+                    -x "node_modules/*" \
+                    -x ".git/*"
                 '''
-                
+
                 script {
-                    def server = Artifactory.server 'artifactory-server'
+                    def server = Artifactory.server('artifactory-server')
                     def uploadSpec = """{
-                        "files": [ {
+                        "files": [{
                             "pattern": "php-todo.zip",
                             "target": "php-todo-local/${BUILD_NUMBER}/",
                             "props": "BUILD_NUMBER=${BUILD_NUMBER};BRANCH=${params.branch}"
-                        } ]
+                        }]
                     }"""
-                    
                     server.upload spec: uploadSpec
                 }
             }
         }
 
-        // ===============================
-        // Step 8: Checkout Ansible Repo
-        // ===============================
         stage('Checkout Ansible Repo') {
             steps {
                 dir('ansible-config-mgt') {
@@ -214,23 +189,21 @@ pipeline {
             }
         }
 
-        // ===============================
-        // Step 9: Deploy to Environment
-        // ===============================
         stage('Deploy to Environment') {
             steps {
                 dir('ansible-config-mgt') {
-                    ansiblePlaybook(
-                        playbook: 'playbooks/deploy.yml',
-                        inventory: "inventory/${params.environment}/hosts.ini",
-                        extras: "-e artifact_version=${BUILD_NUMBER}",
-                        colorized: true
-                    )
+                    withEnv(['ANSIBLE_HOST_KEY_CHECKING=False']) {
+                        ansiblePlaybook(
+                            playbook: 'playbooks/deploy.yml',
+                            inventory: "inventory/${params.environment}/hosts.ini",
+                            extras: "-e artifact_version=${BUILD_NUMBER}",
+                            colorized: true
+                        )
+                    }
                 }
             }
         }
-
-    } // end of stages
+    }
 
     post {
         always {
@@ -238,7 +211,6 @@ pipeline {
             cleanWs()
         }
     }
-
 }
 
 
