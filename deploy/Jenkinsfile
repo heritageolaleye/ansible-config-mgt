@@ -156,6 +156,29 @@ pipeline {
             }
         }
 
+        // ===============================
+        // Step 7: SonarQube Analysis (COMMENTED OUT)
+        // ===============================
+        /*
+        stage('SonarQube Analysis') {
+            environment {
+                scannerHome = tool 'SonarQubeScanner'
+            }
+            steps {
+                echo "SonarQube Scanner Path: ${scannerHome}"
+                withSonarQubeEnv('SonarQubeServer') {
+                    sh '''
+                    ${scannerHome}/bin/sonar-scanner \
+                      -Dsonar.projectKey=php-todo \
+                      -Dsonar.sources=. \
+                      -Dsonar.php.tests.reportPath=tests/junit.xml \
+                      -Dsonar.php.coverage.reportPaths=coverage.xml
+                    '''
+                }
+            }
+        }
+        */
+
         stage('Package Application') {
             steps {
                 sh '''
@@ -193,13 +216,21 @@ pipeline {
             steps {
                 dir('ansible-config-mgt') {
                     withEnv(['ANSIBLE_HOST_KEY_CHECKING=False']) {
-                        // Run playbook as ennoiaconcept
                         sh """
                             sudo -u ennoiaconcept ansible-playbook playbooks/deploy.yml \
                                 -i inventory/${params.environment}/hosts.ini \
                                 -e artifact_version=${BUILD_NUMBER} \
                         """
                     }
+                }
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    def verifyUrl = "http://35.177.30.156"
+                    sh "curl -I ${verifyUrl}"
                 }
             }
         }
