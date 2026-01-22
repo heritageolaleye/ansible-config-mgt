@@ -229,7 +229,7 @@ pipeline {
         stage('Verify Deployment') {
             steps {
                 script {
-                    def verifyUrl = "http://35.177.30.156"
+                    def verifyUrl = "http://35.188.28.83"
                     sh "curl -I ${verifyUrl}"
                 }
             }
