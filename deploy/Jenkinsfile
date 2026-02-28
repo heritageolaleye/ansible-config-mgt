@@ -1,12 +1,259 @@
 pipeline {
     agent any
+
+    options {
+        timestamps()
+    }
+
+    parameters {
+        string(name: 'branch', defaultValue: 'main', description: 'Branch to build')
+        choice(name: 'environment', choices: ['dev', 'qa', 'prod'], description: 'Target deployment environment')
+    }
+
     stages {
-        stage('Test') {
+
+        stage('Cleanup') {
             steps {
-                sh 'echo "Jenkins is now fully functional 🚀"'
+                deleteDir()
+            }
+        }
+
+        stage('Checkout SCM') {
+            steps {
+                git branch: "${params.branch}",
+                    credentialsId: 'github-token',
+                    url: 'https://github.com/heritageolaleye/php-todo.git'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh '''
+                cp .env.sample .env || true
+
+                mkdir -p bootstrap/cache
+                mkdir -p storage/framework/{sessions,views,cache}
+                mkdir -p storage/logs
+                mkdir -p build/logs
+
+                chmod -R 775 storage bootstrap/cache
+
+                composer install --no-interaction --prefer-dist
+
+                php artisan key:generate
+                php artisan config:clear
+                php artisan cache:clear
+                '''
+            }
+        }
+
+        stage('Execute Unit Tests') {
+            steps {
+                sh '''
+                echo "SESSION_DRIVER=file" >> .env
+                echo "CACHE_DRIVER=file" >> .env
+                echo "QUEUE_DRIVER=sync" >> .env
+
+                php artisan config:clear
+                php artisan cache:clear
+
+                ./vendor/bin/phpunit || true
+                '''
+            }
+        }
+
+        stage('PHPLoc Analysis') {
+            steps {
+                sh '''
+                if [ ! -f ./vendor/bin/phploc ]; then
+                    composer require --dev phploc/phploc
+                fi
+
+                ./vendor/bin/phploc app/ --log-csv build/logs/phploc.csv
+                '''
+            }
+        }
+
+        stage('Plot Code Metrics') {
+            steps {
+                plot csvFileName: 'phploc_loc.csv',
+                     csvSeries: [[
+                        file: 'build/logs/phploc.csv',
+                        inclusionFlag: 'INCLUDE_BY_STRING',
+                        inclusionValues: 'Lines of Code (LOC),Comment Lines of Code (CLOC),Non-Comment Lines of Code (NCLOC),Logical Lines of Code (LLOC)',
+                        displayTableFlag: false
+                     ]],
+                     group: 'phploc',
+                     title: 'A - Lines of Code',
+                     style: 'line',
+                     yaxis: 'Lines',
+                     numBuilds: '100'
+
+                plot csvFileName: 'phploc_structure.csv',
+                     csvSeries: [[
+                        file: 'build/logs/phploc.csv',
+                        inclusionFlag: 'INCLUDE_BY_STRING',
+                        inclusionValues: 'Directories,Files,Namespaces',
+                        displayTableFlag: false
+                     ]],
+                     group: 'phploc',
+                     title: 'B - Project Structure',
+                     style: 'line',
+                     yaxis: 'Count',
+                     numBuilds: '100'
+
+                plot csvFileName: 'phploc_classes.csv',
+                     csvSeries: [[
+                        file: 'build/logs/phploc.csv',
+                        inclusionFlag: 'INCLUDE_BY_STRING',
+                        inclusionValues: 'Classes,Abstract Classes,Concrete Classes',
+                        displayTableFlag: false
+                     ]],
+                     group: 'phploc',
+                     title: 'C - Classes',
+                     style: 'line',
+                     yaxis: 'Count',
+                     numBuilds: '100'
+
+                plot csvFileName: 'phploc_methods.csv',
+                     csvSeries: [[
+                        file: 'build/logs/phploc.csv',
+                        inclusionFlag: 'INCLUDE_BY_STRING',
+                        inclusionValues: 'Methods,Static Methods,Public Methods,Non-Public Methods',
+                        displayTableFlag: false
+                     ]],
+                     group: 'phploc',
+                     title: 'D - Methods',
+                     style: 'line',
+                     yaxis: 'Count',
+                     numBuilds: '100'
+
+                plot csvFileName: 'phploc_functions.csv',
+                     csvSeries: [[
+                        file: 'build/logs/phploc.csv',
+                        inclusionFlag: 'INCLUDE_BY_STRING',
+                        inclusionValues: 'Functions,Named Functions,Anonymous Functions,Constants',
+                        displayTableFlag: false
+                     ]],
+                     group: 'phploc',
+                     title: 'E - Functions & Constants',
+                     style: 'line',
+                     yaxis: 'Count',
+                     numBuilds: '100'
+
+                plot csvFileName: 'phploc_dependencies.csv',
+                     csvSeries: [[
+                        file: 'build/logs/phploc.csv',
+                        inclusionFlag: 'INCLUDE_BY_STRING',
+                        inclusionValues: 'Global Accesses,Attribute Accesses,Method Calls',
+                        displayTableFlag: false
+                     ]],
+                     group: 'phploc',
+                     title: 'F - Dependencies',
+                     style: 'line',
+                     yaxis: 'Count',
+                     numBuilds: '100'
+            }
+        }
+
+        // ===============================
+        // Step 7: SonarQube Analysis (COMMENTED OUT)
+        // ===============================
+        /*
+        stage('SonarQube Analysis') {
+            environment {
+                scannerHome = tool 'SonarQubeScanner'
+            }
+            steps {
+                echo "SonarQube Scanner Path: ${scannerHome}"
+                withSonarQubeEnv('SonarQubeServer') {
+                    sh '''
+                    ${scannerHome}/bin/sonar-scanner \
+                      -Dsonar.projectKey=php-todo \
+                      -Dsonar.sources=. \
+                      -Dsonar.php.tests.reportPath=tests/junit.xml \
+                      -Dsonar.php.coverage.reportPaths=coverage.xml
+                    '''
+                }
+            }
+        }
+        */
+
+        stage('Package Application') {
+            steps {
+                sh '''
+                zip -r php-todo.zip . \
+                    -x "vendor/*" \
+                    -x "node_modules/*" \
+                    -x ".git/*"
+                '''
+
+                script {
+                    def server = Artifactory.server('artifactory-server')
+                    def uploadSpec = """{
+                        "files": [{
+                            "pattern": "php-todo.zip",
+                            "target": "php-todo-local/${BUILD_NUMBER}/",
+                            "props": "BUILD_NUMBER=${BUILD_NUMBER};BRANCH=${params.branch}"
+                        }]
+                    }"""
+                    server.upload spec: uploadSpec
+                }
+            }
+        }
+
+        stage('Checkout Ansible Repo') {
+            steps {
+                dir('ansible-config-mgt') {
+                    git branch: 'master',
+                        credentialsId: 'github-token',
+                        url: 'https://github.com/heritageolaleye/ansible-config-mgt.git'
+                }
+            }
+        }
+
+        stage('Deploy to Environment') {
+            steps {
+                dir('ansible-config-mgt') {
+                    withEnv(['ANSIBLE_HOST_KEY_CHECKING=False']) {
+                        sh """
+                            sudo -u ennoiaconcept ansible-playbook playbooks/deploy.yml \
+                                -i inventory/${params.environment}/hosts.ini \
+                                -e artifact_version=${BUILD_NUMBER} \
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    def verifyUrl = "http://35.188.28.83"
+                    sh "curl -I ${verifyUrl}"
+                }
             }
         }
     }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'build/logs/phploc.csv', fingerprint: true
+            cleanWs()
+        }
+    }
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 
